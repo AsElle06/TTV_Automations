@@ -306,7 +306,7 @@ class Monday:
         Args:
             task_data: The dict returned by get_task_data().
         Returns:
-            The first Subtask that satisfies one of these rules (in order):
+            The first Subtask(a Subtask object) that satisfies one of these rules (in order):
               1. It is the first subitem and its status is 'Not Started'.
               2. The previous subitem is 'Done' and this subitem is 'Not Started'.
             Returns None if the parent task is not 'Working on it', or no
