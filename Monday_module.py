@@ -227,11 +227,11 @@ class Monday:
                     {
                         "id": "subitem_id",
                         "name": "subitem name",
-                        "columns": {
-                            "person": "Suling Lim",
-                            "status": "Not Started",
-                            "pulse_updated_mm3jq690": "2026-05-21 02:08:18 UTC"
-                        }
+                        "columns": [
+                            {"id": "status", "type": "status", "text": "Not Started"},
+                            {"id": "person", "type": "people", "text": "Suling Lim"},
+                            {"id": "pulse_updated_mm3jq690", "type": "pulse_updated", "text": "2026-05-21 02:08:18 UTC"}
+                        ]
                     },
                     ...
                 ]
@@ -249,8 +249,9 @@ class Monday:
             subitems {
             id
             name
-            column_values(ids: ["person", "status", "pulse_updated_mm3jq690"]) {
+            column_values {
                 id
+                type
                 text
             }
             }
@@ -268,7 +269,7 @@ class Monday:
             {
                 "id": sub["id"],
                 "name": sub["name"],
-                "columns": {col["id"]: col["text"] for col in sub["column_values"]},
+                "columns": sub["column_values"],  # list of {id, type, text}
             }
             for sub in (item.get("subitems") or [])
         ]
@@ -299,33 +300,100 @@ class Monday:
         return None
 
     @staticmethod
-    def get_target_subtask_(task_data: dict) -> dict | None:
+    def get_target_subtask(task_data: dict) -> "Subtask | None":
         """
         Find the first subtask to work on for a main task that is 'Working on it'.
         Args:
             task_data: The dict returned by get_task_data().
         Returns:
-            The first subtask dict that satisfies one of these rules (in order):
+            The first Subtask that satisfies one of these rules (in order):
               1. It is the first subitem and its status is 'Not Started'.
               2. The previous subitem is 'Done' and this subitem is 'Not Started'.
             Returns None if the parent task is not 'Working on it', or no
             subitem matches the above rules.
         """
-        # guard to double check if the main task is 'Working on it'
         if task_data["columns"].get("project_status") != "Working on it":
             return None
-        
+
         subitems = task_data.get("subitems") or []
         for i, subitem in enumerate(subitems):
-            if subitem["columns"].get("status") != "Not Started":
+            sub = Subtask(subitem)
+            if sub.status != "Not Started":
                 continue
-            if i == 0 or subitems[i - 1]["columns"].get("status") == "Done":
-                return subitem
+            if i == 0 or Subtask(subitems[i - 1]).status == "Done":
+                return sub
 
         return None
 
+class Subtask:
+    """
+    Wrapper around a subitem dict returned by Monday.get_task_data().
 
+    Columns are looked up by their Monday column type (e.g. "status", "people",
+    "pulse_updated") rather than their board-specific column ID, so this class
+    works across boards where column IDs differ.
+
+    To discover all available types and values for a subitem, inspect:
+        subtask_data["columns"]  →  list of {id, type, text}
+    """
+
+    def __init__(self, subtask_data: dict):
+        self.id = subtask_data["id"]
+        self.name = subtask_data["name"]
+        self.data: dict[str, str] = {
+            col["type"]: col["text"] for col in subtask_data["columns"]
+        }
+
+    @property
+    def status(self) -> str:
+        return self.data.get("status", "")
+
+    @property
+    def assignee(self) -> str:
+        return self.data.get("people", "")
+
+    @property
+    def last_updated(self) -> str:
+        return self.data.get("pulse_updated", "")
+
+    def __repr__(self) -> str:
+        return f"Subtask(id={self.id!r}, name={self.name!r}, status={self.status!r})"
+
+
+### ---------- TEST ---------- ###
 if __name__ == "__main__":
+    # --- test Subtask (no API calls needed) ---
+    print("=== Subtask tests ===")
+    _full = {
+        "id": "111",
+        "name": "Edit video",
+        "columns": [
+            {"id": "status",                  "type": "status",        "text": "Not Started"},
+            {"id": "person",                  "type": "people",        "text": "Suling Lim"},
+            {"id": "pulse_updated_mm3jq690",  "type": "pulse_updated", "text": "2026-05-21 02:08:18 UTC"},
+        ],
+    }
+    _empty = {"id": "222", "name": "No columns", "columns": []}
+
+    sub = Subtask(_full)
+    assert sub.id == "111",                             "id mismatch"
+    assert sub.name == "Edit video",                    "name mismatch"
+    assert sub.status == "Not Started",                 "status mismatch"
+    assert sub.assignee == "Suling Lim",                "assignee mismatch"
+    assert sub.last_updated == "2026-05-21 02:08:18 UTC", "last_updated mismatch"
+    assert "Edit video" in repr(sub),                   "__repr__ missing name"
+    assert "Not Started" in repr(sub),                  "__repr__ missing status"
+    print(f"  full subtask:    {sub}")
+
+    sub_empty = Subtask(_empty)
+    assert sub_empty.status == "",       "missing status should return empty string"
+    assert sub_empty.assignee == "",     "missing assignee should return empty string"
+    assert sub_empty.last_updated == "", "missing last_updated should return empty string"
+    print(f"  empty subtask:   {sub_empty}")
+
+    print("All Subtask tests passed.\n")
+
+    # --- API tests ---
     client = Monday(
         token=os.getenv("MONDAY_API_TOKEN"),
         board_id=int(os.getenv("MONDAY_BOARD_ID")),
