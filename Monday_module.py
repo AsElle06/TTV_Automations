@@ -282,24 +282,6 @@ class Monday:
         }
 
     @staticmethod
-    def get_task_status(board_data: dict, task_id: str) -> str | None:
-        """
-        Find a task by its ID in the given board data and return its status.
-        Args:
-            board_data: The dict returned by get_board_data()
-            task_id: The Monday item ID of the task to look up
-        Returns:
-            The status string (e.g., "Working on it", "Done"), or None
-            if the task isn't found or has no status set.
-        """
-        task_id = str(task_id)  # normalize in case caller passed an int
-        for group_data in board_data.values():
-            for task in group_data["tasks"]:
-                if task["id"] == task_id:
-                    return task["columns"].get("project_status")
-        return None
-
-    @staticmethod
     def get_target_subtask(task_data: dict) -> "Subtask | None":
         """
         Find the first subtask to work on for a main task that is 'Working on it'.
@@ -330,7 +312,7 @@ class Subtask:
     Wrapper around a subitem dict returned by Monday.get_task_data().
 
     Columns are looked up by their Monday column type (e.g. "status", "people",
-    "pulse_updated") rather than their board-specific column ID, so this class
+    "last_updated") rather than their board-specific column ID, so this class
     works across boards where column IDs differ.
 
     To discover all available types and values for a subitem, inspect:
@@ -354,7 +336,7 @@ class Subtask:
 
     @property
     def last_updated(self) -> str:
-        return self.data.get("pulse_updated", "")
+        return self.data.get("last_updated", "")
 
     def __repr__(self) -> str:
         return f"Subtask(id={self.id!r}, name={self.name!r}, status={self.status!r})"
@@ -370,7 +352,7 @@ if __name__ == "__main__":
         "columns": [
             {"id": "status",                  "type": "status",        "text": "Not Started"},
             {"id": "person",                  "type": "people",        "text": "Suling Lim"},
-            {"id": "pulse_updated_mm3jq690",  "type": "pulse_updated", "text": "2026-05-21 02:08:18 UTC"},
+            {"id": "pulse_updated_mm3jq690",  "type": "last_updated", "text": "2026-05-21 02:08:18 UTC"},
         ],
     }
     _empty = {"id": "222", "name": "No columns", "columns": []}
@@ -411,10 +393,5 @@ if __name__ == "__main__":
         print(f"\nFetching task data for task id: {test_task_id}")
         task_data = client.get_task_data(test_task_id)
         print(json.dumps(task_data, indent=2))
-        # --- test get_task_status ---
-        status = Monday.get_task_status(data, test_task_id)
-        print(f"\nStatus for task {test_task_id}: {status!r}")
-        status_missing = Monday.get_task_status(data, "nonexistent_id")
-        print(f"Status for nonexistent task: {status_missing!r}")  # expected: None
     else:
-        print("No tasks found on the board to test get_task_data / get_task_status.")
+        print("No tasks found on the board to test get_task_data.")
