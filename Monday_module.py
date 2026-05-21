@@ -89,7 +89,10 @@ class Monday:
         """
         variables = {"board_id": [str(self.board_id)]}
         data = self._post_query(query, variables)
-        return data["data"]["boards"][0]
+        boards = data["data"]["boards"]
+        if not boards:
+            raise ValueError(f"Board {self.board_id} not found. Check your MONDAY_BOARD_ID in .env.")
+        return boards[0]
 
     def get_board_data(self) -> dict[str, dict]:
         """
@@ -137,7 +140,10 @@ class Monday:
         }
         """
         groups_data = self._post_query(groups_query, {"board_id": [str(self.board_id)]})
-        groups = groups_data["data"]["boards"][0]["groups"]
+        boards = groups_data["data"]["boards"]
+        if not boards:
+            raise ValueError(f"Board {self.board_id} not found. Check your MONDAY_BOARD_ID in .env.")
+        groups = boards[0]["groups"]
 
         result: dict[str, dict] = {}
         group_title_by_id: dict[str, str] = {}
