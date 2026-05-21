@@ -122,7 +122,7 @@ class Monday:
         Strategy: two-step fetch to minimise complexity budget usage.
           1. Cheap groups query to build the group-id → title map.
           2. Board-level items_page (not nested inside groups) with cursor-based
-             pagination via next_items_page at the query root — far lower complexity
+             pagination via next_items_page at the query root, far lower complexity
              than nesting items_page inside every group.
         """
         # Step 1: fetch groups (lightweight)
@@ -209,6 +209,81 @@ class Monday:
 
         return result
 
+    def get_task_data(self, task_id: int | str) -> dict:
+        """
+        Fetch a single task and all of its subitems.
+
+        Args:
+            task_id: The item ID of the task
+
+        Returns:
+            {
+                "id": "2700464157",
+                "name": "task name",
+                "columns": {
+                    "project_owner": "Suling Lim",
+                    "project_status": "Not Started",
+                    "pulse_updated": "2026-05-14 02:55:40 UTC"
+                },
+                "subitems": [
+                    {
+                        "id": "subitem_id",
+                        "name": "subitem name",
+                        "columns": {
+                            "person": "Suling Lim",
+                            "status": "Not Started",
+                            "pulse_updated_mm3jq690": "2026-05-21 02:08:18 UTC"
+                        }
+                    },
+                    ...
+                ]
+            }
+
+
+        """
+        query = """
+        query ($item_id: [ID!]) {
+        items(ids: $item_id) {
+            id
+            name
+            column_values(ids: ["project_owner", "project_status", "pulse_updated"]) {
+            id
+            text
+            }
+            subitems {
+            id
+            name
+            column_values(ids: ["person", "status", "pulse_updated_mm3jq690"]) {
+                id
+                text
+            }
+            }
+        }
+        }
+        """
+        data = self._post_query(query, {"item_id": [str(task_id)]})
+        items = data["data"]["items"]
+
+        if not items:
+            raise ValueError(f"Task {task_id} not found")
+
+        item = items[0]
+        subitems = [
+            {
+                "id": sub["id"],
+                "name": sub["name"],
+                "columns": {col["id"]: col["text"] for col in sub["column_values"]},
+            }
+            for sub in (item.get("subitems") or [])
+        ]
+
+        return {
+            "id": item["id"],
+            "name": item["name"],
+            "columns": {col["id"]: col["text"] for col in item["column_values"]},
+            "subitems": subitems,
+        }
+
 
 if __name__ == "__main__":
     client = Monday(
@@ -221,3 +296,14 @@ if __name__ == "__main__":
 
     data = client.get_board_data()
     print(json.dumps(data, indent=2))
+
+    # --- test get_task_data ---
+    # Grab the ID of the first task on the board to use as a test subject
+    first_group = next(iter(data.values()))
+    if first_group["tasks"]:
+        test_task_id = first_group["tasks"][0]["id"]
+        print(f"\nFetching task data for task id: {test_task_id}")
+        task_data = client.get_task_data(test_task_id)
+        print(json.dumps(task_data, indent=2))
+    else:
+        print("No tasks found on the board to test get_task_data.")
