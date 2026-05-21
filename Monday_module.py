@@ -208,14 +208,12 @@ class Monday:
             page = data["data"]["next_items_page"]
 
         return result
-
+    
     def get_task_data(self, task_id: int | str) -> dict:
         """
         Fetch a single task and all of its subitems.
-
         Args:
             task_id: The item ID of the task
-
         Returns:
             {
                 "id": "2700464157",
@@ -238,8 +236,6 @@ class Monday:
                     ...
                 ]
             }
-
-
         """
         query = """
         query ($item_id: [ID!]) {
@@ -284,26 +280,73 @@ class Monday:
             "subitems": subitems,
         }
 
+    @staticmethod
+    def get_task_status(board_data: dict, task_id: str) -> str | None:
+        """
+        Find a task by its ID in the given board data and return its status.
+        Args:
+            board_data: The dict returned by get_board_data()
+            task_id: The Monday item ID of the task to look up
+        Returns:
+            The status string (e.g., "Working on it", "Done"), or None
+            if the task isn't found or has no status set.
+        """
+        task_id = str(task_id)  # normalize in case caller passed an int
+        for group_data in board_data.values():
+            for task in group_data["tasks"]:
+                if task["id"] == task_id:
+                    return task["columns"].get("project_status")
+        return None
+
+    @staticmethod
+    def get_target_subtask_(task_data: dict) -> dict | None:
+        """
+        Find the first subtask to work on for a main task that is 'Working on it'.
+        Args:
+            task_data: The dict returned by get_task_data().
+        Returns:
+            The first subtask dict that satisfies one of these rules (in order):
+              1. It is the first subitem and its status is 'Not Started'.
+              2. The previous subitem is 'Done' and this subitem is 'Not Started'.
+            Returns None if the parent task is not 'Working on it', or no
+            subitem matches the above rules.
+        """
+        # guard to double check if the main task is 'Working on it'
+        if task_data["columns"].get("project_status") != "Working on it":
+            return None
+        
+        subitems = task_data.get("subitems") or []
+        for i, subitem in enumerate(subitems):
+            if subitem["columns"].get("status") != "Not Started":
+                continue
+            if i == 0 or subitems[i - 1]["columns"].get("status") == "Done":
+                return subitem
+
+        return None
+
 
 if __name__ == "__main__":
     client = Monday(
         token=os.getenv("MONDAY_API_TOKEN"),
         board_id=int(os.getenv("MONDAY_BOARD_ID")),
     )
-
+    # --- test get_board_summary ---
     summary = client.get_board_summary()
     print(json.dumps(summary, indent=2))
-
+    # --- test get_board_data ---
     data = client.get_board_data()
     print(json.dumps(data, indent=2))
-
-    # --- test get_task_data ---
-    # Grab the ID of the first task on the board to use as a test subject
     first_group = next(iter(data.values()))
     if first_group["tasks"]:
         test_task_id = first_group["tasks"][0]["id"]
+        # --- test get_task_data ---
         print(f"\nFetching task data for task id: {test_task_id}")
         task_data = client.get_task_data(test_task_id)
         print(json.dumps(task_data, indent=2))
+        # --- test get_task_status ---
+        status = Monday.get_task_status(data, test_task_id)
+        print(f"\nStatus for task {test_task_id}: {status!r}")
+        status_missing = Monday.get_task_status(data, "nonexistent_id")
+        print(f"Status for nonexistent task: {status_missing!r}")  # expected: None
     else:
-        print("No tasks found on the board to test get_task_data.")
+        print("No tasks found on the board to test get_task_data / get_task_status.")
