@@ -1,3 +1,7 @@
+"""
+Monday module.
+This module retrieves information needed for the Supabase module and updates columns in the corresponding Monday board.
+"""
 import os
 import time
 import requests
@@ -7,6 +11,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Monday:
+
+    """Client for query/mutate Monday board."""
 
     API_URL = "https://api.monday.com/v2"
     API_VERSION = "2024-10"
