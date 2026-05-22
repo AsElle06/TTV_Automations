@@ -1,10 +1,11 @@
 """
-Supabase module.
+Supabase module for the TTV Automations Project.
 This module is the linkage layer between Monday and WhatsApp.
 """
 
 import os
 from supabase import create_client, Client
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,19 +47,61 @@ class Supabase:
             return None
 
         return result.data[0]["whatsapp_num"]
+    
+    def update_previous_ping(self, monday_acc: str) -> bool:
+        """
+        Set `previous_ping` to the current UTC time for the given assignee.
+
+        Args:
+            monday_acc: The Monday assignee name to update
+
+        Returns:
+            True if a row was updated, False if no matching record exists.
+        """
+        now_utc = datetime.now(timezone.utc).isoformat()
+
+        result = (
+            self.client.table(self.TABLE_NAME)
+            .update({"previous_ping": now_utc})
+            .eq("monday_acc", monday_acc)
+            .execute()
+        )
+
+        return len(result.data) > 0
 
 
 ### ---------- TEST ---------- ###
 if __name__ == "__main__":
-    client = Supabase(
+    supabase_table = Supabase(
         url=os.getenv("SUPABASE_URL"),
         key=os.getenv("SUPABASE_KEY"),
     )
 
-    # --- test get_whatsapp_num ---
-    # Test with a real name from your table
-    number = client.get_whatsapp_num("Suling Lim")
+    # --- Test get_whatsapp_num ---
+    print("--- Test get_whatsapp_num ---")
+    number = supabase_table.get_whatsapp_num("Suling Lim")
     print(f"Number: {number}")
-    # Test with a name that doesn't exist
-    missing = client.get_whatsapp_num("Nonexistent Person")
+
+    # --- Test get_whatsapp_num (missing) ---
+    missing = supabase_table.get_whatsapp_num("Nonexistent Person")
     print(f"Missing: {missing}")
+
+    # --- Test update_previous_ping ---
+    print("\n--- Test update_previous_ping ---")
+    success = supabase_table.update_previous_ping("Suling Lim")
+    print(f"Updated: {success}")
+
+    # --- Test update_previous_ping (missing) ---
+    print("\n--- Test update_previous_ping (missing) ---")
+    success = supabase_table.update_previous_ping("Nonexistent Person")
+    print(f"Updated: {success}")
+
+    # --- Verify previous_ping was set ---
+    print("\n--- Verify previous_ping was set ---")
+    result = (
+        supabase_table.client.table(supabase_table.TABLE_NAME)
+        .select("monday_acc, previous_ping")
+        .eq("monday_acc", "Suling Lim")
+        .execute()
+    )
+    print(result.data)

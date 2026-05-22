@@ -1,5 +1,5 @@
 """
-Monday module.
+Supabase module for the TTV Automations Project.
 This module retrieves information needed for the Supabase module and updates columns in the corresponding Monday board.
 """
 import os
