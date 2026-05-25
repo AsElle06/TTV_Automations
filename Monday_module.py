@@ -6,6 +6,7 @@ import os
 import time
 import requests
 import json
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -336,6 +337,33 @@ class Monday:
                 continue
             if i == 0 or Subtask(subitems[i - 1]).status == "Done":
                 return sub
+
+        return None
+
+    @staticmethod
+    def get_stale_subtask(task_data: dict, stale_after: "timedelta") -> "Subtask | None":
+        """
+        Find the currently active subtask if it has not been updated within stale_after.
+
+        Args:
+            task_data: The dict returned by get_task_data().
+            stale_after: How long without an update before a subtask is considered stale.
+
+        Returns:
+            The Subtask whose status is 'Working on it' and whose last_updated is
+            older than stale_after, or None if no such subtask exists.
+        """
+        subitems = task_data.get("subitems") or []
+        for subitem in subitems:
+            sub = Subtask(subitem)
+            if sub.status != "Working on it":
+                continue
+            if not sub.last_updated:
+                break
+            last_dt = datetime.strptime(sub.last_updated, "%Y-%m-%d %H:%M:%S UTC").replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - last_dt > stale_after:
+                return sub
+            break  # only one 'Working on it' subtask at a time
 
         return None
 
