@@ -4,6 +4,7 @@ This module uses Twilio's WhatsApp API (Sandbox in development, WABA in producti
 """
 
 import os
+import json
 from twilio.rest import Client
 from dotenv import load_dotenv
 
@@ -24,15 +25,16 @@ class WhatsApp:
         self.client = Client(account_sid, auth_token)
         self.from_number = f"whatsapp:+{from_number}"
 
-    def send_message(self, to_number: str, body: str) -> str:
+    def send_message(self, to_number: str, content_sid: str, content_variables: dict | None = None) -> str:
         """
-        Send a WhatsApp text message.
+        Send a WhatsApp message using a Twilio content template.
 
         Args:
             to_number: Recipient phone number, digits only, with country code
                        e.g., "61412345678" for an Australian mobile
-            body: The message text (free-form for sandbox / inside 24h window;
-                  must use approved template in production)
+            content_sid: The template SID from Twilio Content Editor, e.g. "HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            content_variables: Optional dict mapping placeholder indices to values,
+                               e.g. {"1": "Suling Lim", "2": "Edit video"}
 
         Returns:
             The Twilio message SID — a unique ID like "SM1234..." used to track
@@ -41,7 +43,8 @@ class WhatsApp:
         message = self.client.messages.create(
             from_=self.from_number,
             to=f"whatsapp:+{to_number}",
-            body=body,
+            content_sid=content_sid,
+            content_variables=json.dumps(content_variables) if content_variables else None,
         )
         return message.sid
 
@@ -59,7 +62,8 @@ if __name__ == "__main__":
     # --- test send_message ---
     sid = whatsapp_acc.send_message(
         to_number=MY_NUMBER,
-        body="🎉 Hello from my TTV Automations bot!",
+        content_sid=os.getenv("TWILIO_CONTENT_SID"),
+        content_variables={"1": "Suling Lim", "2": "Edit video"},
     )
-    print(f"✅ Message sent successfully")
+    print(f"Message sent successfully")
     print(f"   Twilio SID: {sid}")

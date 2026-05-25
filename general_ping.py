@@ -1,19 +1,30 @@
 import os
 from dotenv import load_dotenv
 from Monday_module import Monday
+from Supabase_module import Supabase
+from Whatsapp_module import WhatsApp
 
 load_dotenv()
 
 
 def general_ping():
-    client = Monday(
+    monday = Monday(
         token=os.getenv("MONDAY_API_TOKEN"),
         board_id=int(os.getenv("MONDAY_BOARD_ID")),
+    )
+    supabase = Supabase(
+        url=os.getenv("SUPABASE_URL"),
+        key=os.getenv("SUPABASE_KEY"),
+    )
+    wa = WhatsApp(
+        account_sid=os.getenv("TWILIO_ACCOUNT_SID"),
+        auth_token=os.getenv("TWILIO_AUTH_TOKEN"),
+        from_number=os.getenv("TWILIO_WHATSAPP_FROM"),
     )
 
     # fetch all board data
     print("Fetching board data...")
-    board_data = client.get_board_data()
+    board_data = monday.get_board_data()
 
     # collect IDs of main tasks that are "Working on it"
     working_task_ids = []
@@ -25,27 +36,42 @@ def general_ping():
 
     print(f"\n{len(working_task_ids)} task(s) currently 'Working on it'.\n")
 
-    # for each task, find its target subtask and inspect it
     for task_id in working_task_ids:
         print(f"--- Task {task_id} ---")
 
-        # fetch full task data including subitems
-        task_data = client.get_task_data(task_id)
-        print(f"  name: {task_data['name']!r}")
-
-        # find the next subtask to work on (returns a Subtask object)
+        task_data = monday.get_task_data(task_id)
         subtask = Monday.get_target_subtask(task_data)
 
         if subtask is None:
             print("  No target subtask found.\n")
             continue
 
-        # call all Subtask methods and print the values
-        print(f"  target subtask: {subtask}")
-        print(f"    .status:       {subtask.status!r}")
-        print(f"    .assignee:     {subtask.assignee!r}")
-        print(f"    .last_updated: {subtask.last_updated!r}")
-        print()
+        print(f"  Target subtask: {subtask}")
+
+        # Step 1: get assignee from the subtask
+        assignee = subtask.assignee
+        if not assignee:
+            print("  No assignee found on subtask, skipping.\n")
+            continue
+
+        # Step 2: look up their WhatsApp number in Supabase
+        whatsapp_num = supabase.get_whatsapp_num(assignee)
+        if not whatsapp_num:
+            print(f"  No WhatsApp number found for {assignee!r}, skipping.\n")
+            continue
+
+        # Step 3: send notification
+        sid = wa.send_message(
+            to_number=whatsapp_num,
+            content_sid=os.getenv("TWILIO_CONTENT_SID_NEWTASK"),
+            content_variables={
+                "1": assignee,
+                "2": task_data["name"],
+                "3": subtask.name,
+                "4": subtask.id,
+            },
+        )
+        print(f"  Notified {assignee!r} → SID: {sid}\n")
 
 
 if __name__ == "__main__":

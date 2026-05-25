@@ -240,15 +240,17 @@ class Monday:
                         "id": "subitem_id",
                         "name": "subitem name",
                         "columns": [
-                            {"id": "status", "type": "status", "text": "Not Started"},
-                            {"id": "person", "type": "people", "text": "Suling Lim"},
-                            {"id": "pulse_updated_mm3jq690", "type": "pulse_updated", "text": "2026-05-21 02:08:18 UTC"}
+                            {"id": "status", "title": "Status", "text": "Not Started"},
+                            {"id": "person", "title": "Responsible", "text": "Suling Lim"},
+                            {"id": "pulse_updated_mm3jq690", "title": "Last updated", "text": "2026-05-21 02:08:18 UTC"}
                         ]
                     },
                     ...
                 ]
             }
         """
+        # board { columns } gives us the id → title map for subitem columns,
+        # since "title" is not available directly on ColumnValue.
         query = """
         query ($item_id: [ID!]) {
         items(ids: $item_id) {
@@ -261,9 +263,14 @@ class Monday:
             subitems {
             id
             name
+            board {
+                columns {
+                id
+                title
+                }
+            }
             column_values {
                 id
-                type
                 text
             }
             }
@@ -277,13 +284,26 @@ class Monday:
             raise ValueError(f"Task {task_id} not found")
 
         item = items[0]
+        raw_subitems = item.get("subitems") or []
+
+        # Build id → title map once from the first subitem's board columns
+        col_title_map: dict[str, str] = {}
+        if raw_subitems:
+            col_title_map = {
+                col["id"]: col["title"]
+                for col in raw_subitems[0]["board"]["columns"]
+            }
+
         subitems = [
             {
                 "id": sub["id"],
                 "name": sub["name"],
-                "columns": sub["column_values"],  # list of {id, type, text}
+                "columns": [
+                    {"id": cv["id"], "title": col_title_map.get(cv["id"], cv["id"]), "text": cv["text"]}
+                    for cv in sub["column_values"]
+                ],
             }
-            for sub in (item.get("subitems") or [])
+            for sub in raw_subitems
         ]
 
         return {
@@ -323,32 +343,31 @@ class Subtask:
     """
     Wrapper around a subitem dict returned by Monday.get_task_data().
 
-    Columns are looked up by their Monday column type (e.g. "status", "people",
-    "last_updated") rather than their board-specific column ID, so this class
-    works across boards where column IDs differ.
-
-    To discover all available types and values for a subitem, inspect:
-        subtask_data["columns"]  →  list of {id, type, text}
+    Columns are looked up by their display title (the column header name visible
+    on the board). All boards must follow the naming convention:
+        "Status", "Responsible", "Last updated"
+    This ensures the automation works across multiple boards regardless of
+    board-specific column IDs.
     """
 
     def __init__(self, subtask_data: dict):
         self.id = subtask_data["id"]
         self.name = subtask_data["name"]
         self.data: dict[str, str] = {
-            col["type"]: col["text"] for col in subtask_data["columns"]
+            col["title"]: col["text"] for col in subtask_data["columns"]
         }
 
     @property
     def status(self) -> str:
-        return self.data.get("status", "")
+        return self.data.get("Status", "")
 
     @property
     def assignee(self) -> str:
-        return self.data.get("people", "")
+        return self.data.get("Responsible", "")
 
     @property
     def last_updated(self) -> str:
-        return self.data.get("last_updated", "")
+        return self.data.get("Last updated", "")
 
     def __repr__(self) -> str:
         return f"Subtask(id={self.id!r}, name={self.name!r}, status={self.status!r})"
@@ -362,9 +381,9 @@ if __name__ == "__main__":
         "id": "111",
         "name": "Edit video",
         "columns": [
-            {"id": "status",                  "type": "status",        "text": "Not Started"},
-            {"id": "person",                  "type": "people",        "text": "Suling Lim"},
-            {"id": "pulse_updated_mm3jq690",  "type": "last_updated", "text": "2026-05-21 02:08:18 UTC"},
+            {"id": "status",                  "title": "Status",       "text": "Not Started"},
+            {"id": "person",                  "title": "Responsible",  "text": "Suling Lim"},
+            {"id": "pulse_updated_mm3jq690",  "title": "Last updated", "text": "2026-05-21 02:08:18 UTC"},
         ],
     }
     _empty = {"id": "222", "name": "No columns", "columns": []}
