@@ -18,6 +18,9 @@ If the main task status is "Working on it", a subtask assignee will be notified 
 2. The previous subtask is marked "Done", and the current subtask is "Not Started"
 3. The subtask is "Working on it", but has not been updated for more than 24 hours (stale task reminder)
 
+<img width="1402" height="660" alt="Screenshot 2026-06-03 121716" src="https://github.com/user-attachments/assets/fafc7101-1d82-4c80-a11b-9a94f5ad1595" />
+<img width="1386" height="205" alt="Screenshot 2026-06-03 121731" src="https://github.com/user-attachments/assets/68106fec-c5c0-41c4-93f1-918b7b2683c1" />
+
 **Initial Task Notification (Cases 1 & 2)**\
 When a task becomes available, the assignee receives a WhatsApp notification and must respond using one of the following options:
 - **"Working on it"**: Updates task status to Working on it in Monday.com
@@ -38,3 +41,5 @@ The assignee must reply with a progress update, which is automatically attached 
 Once a task is marked "Done" in Monday.com:
 - No further notifications will be sent for that task
 - The next dependent assignee in the workflow will be notified automatically
+
+<img width="1260" height="1500" alt="workflow" src="https://github.com/user-attachments/assets/7474966e-6055-4804-a607-b3c5c0843e78" />
