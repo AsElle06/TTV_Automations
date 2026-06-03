@@ -7,7 +7,7 @@ from Whatsapp_module import WhatsApp
 
 load_dotenv()
 
-ONE_DAY = timedelta(days=1)
+ONE_DAY = timedelta(minutes=1)
 
 
 def general_ping():

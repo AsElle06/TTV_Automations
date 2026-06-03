@@ -23,7 +23,8 @@ class WhatsApp:
                          e.g., "14155238886" for the Twilio Sandbox
         """
         self.client = Client(account_sid, auth_token)
-        self.from_number = f"whatsapp:+{from_number}"
+        normalized = from_number.removeprefix("whatsapp:").lstrip("+")
+        self.from_number = f"whatsapp:+{normalized}"
 
     def send_message(self, to_number: str, content_sid: str, content_variables: dict | None = None) -> str:
         """
@@ -40,9 +41,10 @@ class WhatsApp:
             The Twilio message SID — a unique ID like "SM1234..." used to track
             the message in the Twilio Console.
         """
+        to_normalized = to_number.removeprefix("whatsapp:").lstrip("+")
         message = self.client.messages.create(
             from_=self.from_number,
-            to=f"whatsapp:+{to_number}",
+            to=f"whatsapp:+{to_normalized}",
             content_sid=content_sid,
             content_variables=json.dumps(content_variables) if content_variables else None,
         )
@@ -62,7 +64,7 @@ if __name__ == "__main__":
     # --- test send_message ---
     sid = whatsapp_acc.send_message(
         to_number=MY_NUMBER,
-        content_sid=os.getenv("TWILIO_CONTENT_SID"),
+        content_sid=os.getenv("TWILIO_CONTENT_SID_NEWTASK"),
         content_variables={"1": "Suling Lim", "2": "Edit video"},
     )
     print(f"Message sent successfully")
