@@ -9,7 +9,6 @@ load_dotenv()
 
 ONE_DAY = timedelta(minutes=1)
 
-print()
 def general_ping():
     monday = Monday(
         token=os.getenv("MONDAY_API_TOKEN"),
